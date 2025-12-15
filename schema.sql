@@ -54,6 +54,7 @@ CREATE TABLE purchases (
     supplier_id INT NOT NULL,
     quantity INT NOT NULL,
     purchase_date DATE NOT NULL DEFAULT (CURRENT_DATE),
+    purchase_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     CONSTRAINT fk_purchases_product FOREIGN KEY (product_id) REFERENCES products(product_id) ON UPDATE CASCADE,
     CONSTRAINT fk_purchases_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id) ON UPDATE CASCADE
 );
@@ -64,6 +65,7 @@ CREATE TABLE sales (
     customer_id INT NOT NULL,
     quantity INT NOT NULL,
     sale_date DATE NOT NULL DEFAULT (CURRENT_DATE),
+    sale_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     CONSTRAINT fk_sales_product FOREIGN KEY (product_id) REFERENCES products(product_id) ON UPDATE CASCADE,
     CONSTRAINT fk_sales_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON UPDATE CASCADE
 );
@@ -126,12 +128,12 @@ INSERT INTO users (username, password) VALUES
 ('pharmacist', 'pharmacistpass');
 
 -- Purchases representing incoming stock batches
-INSERT INTO purchases (product_id, supplier_id, quantity, purchase_date) VALUES
-(1, 1, 20, '2024-01-10'),   -- Oak Coffee Table stock
-(2, 2, 15, '2024-02-05'),   -- Velvet Accent Chair stock
-(3, 2, 25, '2023-09-15'),   -- Ceramic Table Lamp stock
-(4, 3, 30, '2024-01-28'),   -- Handwoven Jute Rug stock
-(5, 1, 40, '2024-03-02');   -- Abstract Canvas Art stock
+INSERT INTO purchases (product_id, supplier_id, quantity, purchase_date, purchase_price) VALUES
+(1, 1, 20, '2024-01-10', 180.00),   -- Oak Coffee Table stock
+(2, 2, 15, '2024-02-05', 250.00),   -- Velvet Accent Chair stock
+(3, 2, 25, '2023-09-15', 80.00),    -- Ceramic Table Lamp stock
+(4, 3, 30, '2024-01-28', 140.00),   -- Handwoven Jute Rug stock
+(5, 1, 40, '2024-03-02', 60.00);    -- Abstract Canvas Art stock
 
 -- Stock entries (one expired, one near-expiry, one low stock)
 INSERT INTO stock (product_id, supplier_id, quantity, expiry_date) VALUES
@@ -142,10 +144,10 @@ INSERT INTO stock (product_id, supplier_id, quantity, expiry_date) VALUES
 (5, 1, 35, '2026-05-20');          -- Abstract Canvas Art ample stock
 
 -- Sales referencing products and customers
-INSERT INTO sales (product_id, customer_id, quantity, sale_date) VALUES
-(1, 1, 2, '2024-02-20'),  -- Oak Coffee Table sold 2, leaves 18 in stock
-(2, 2, 3, '2024-03-01'),  -- Velvet Accent Chair sold 3, leaves 12 in stock
-(4, 3, 1, '2024-03-05');  -- Handwoven Jute Rug sold 1, leaves 4 in stock
+INSERT INTO sales (product_id, customer_id, quantity, sale_date, sale_price) VALUES
+(1, 1, 2, '2024-02-20', 220.00),  -- Oak Coffee Table sold 2, leaves 18 in stock
+(2, 2, 3, '2024-03-01', 350.00),  -- Velvet Accent Chair sold 3, leaves 12 in stock
+(4, 3, 1, '2024-03-05', 180.00);  -- Handwoven Jute Rug sold 1, leaves 4 in stock
 
 -- Reflect stock deduction from the Paracetamol sale (already applied above)
 -- For transparency, the initial purchase batch was 100 units, reduced by 5 sold to City Clinic

@@ -188,15 +188,15 @@ def validate_user(username, password):
 
 
 # PURCHASES
-def add_purchase(product_id, supplier_id, quantity, expiry_date=None, purchase_date=None):
+def add_purchase(product_id, supplier_id, quantity, expiry_date=None, purchase_date=None, purchase_price=0.0):
     if purchase_date is None:
         purchase_date = date.today()
     # If no expiry provided, align with purchase_date to satisfy NOT NULL constraint.
     if expiry_date is None:
         expiry_date = purchase_date
     purchase_id = run_query(
-        "INSERT INTO purchases (product_id, supplier_id, quantity, purchase_date) VALUES (%s, %s, %s, %s)",
-        (product_id, supplier_id, quantity, purchase_date),
+        "INSERT INTO purchases (product_id, supplier_id, quantity, purchase_date, purchase_price) VALUES (%s, %s, %s, %s, %s)",
+        (product_id, supplier_id, quantity, purchase_date, purchase_price),
         return_lastrowid=True,
     )
     upsert_stock(product_id, supplier_id, quantity, expiry_date)
@@ -204,13 +204,13 @@ def add_purchase(product_id, supplier_id, quantity, expiry_date=None, purchase_d
 
 
 # SALES
-def add_sale(product_id, customer_id, quantity, sale_date=None):
+def add_sale(product_id, customer_id, quantity, sale_date=None, sale_price=0.0):
     if sale_date is None:
         sale_date = date.today()
     deduct_stock(product_id, quantity)
     sale_id = run_query(
-        "INSERT INTO sales (product_id, customer_id, quantity, sale_date) VALUES (%s, %s, %s, %s)",
-        (product_id, customer_id, quantity, sale_date),
+        "INSERT INTO sales (product_id, customer_id, quantity, sale_date, sale_price) VALUES (%s, %s, %s, %s, %s)",
+        (product_id, customer_id, quantity, sale_date, sale_price),
         return_lastrowid=True,
     )
     return sale_id
@@ -339,7 +339,8 @@ def get_sales_report():
                sa.customer_id,
                cust.name AS customer_name,
                sa.quantity,
-               sa.sale_date
+               sa.sale_date,
+               sa.sale_price
         FROM sales sa
         JOIN products m ON sa.product_id = m.product_id AND m.is_deleted = 0
         LEFT JOIN categories cat ON m.category_id = cat.category_id AND cat.is_deleted = 0
@@ -361,7 +362,8 @@ def get_purchase_report():
                p.supplier_id,
                sup.name AS supplier_name,
                p.quantity,
-               p.purchase_date
+               p.purchase_date,
+               p.purchase_price
         FROM purchases p
         JOIN products m ON p.product_id = m.product_id AND m.is_deleted = 0
         LEFT JOIN categories cat ON m.category_id = cat.category_id AND cat.is_deleted = 0

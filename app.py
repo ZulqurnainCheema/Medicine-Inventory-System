@@ -111,6 +111,7 @@ def products_page():
     if st.button("Add Product"):
         services.add_product(name, selected_category_id, selected_sub_id, price)
         st.success("Product added")
+        st.rerun()
 
     products = services.list_products()
     st.subheader("Manage Products")
@@ -273,6 +274,7 @@ def suppliers_page():
     if st.button("Add Supplier"):
         services.add_supplier(name, contact)
         st.success("Supplier added")
+        st.rerun()
 
     sups = services.list_suppliers()
     st.subheader("Manage Suppliers")
@@ -307,6 +309,7 @@ def customers_page():
     if st.button("Add Customer"):
         services.add_customer(name)
         st.success("Customer added")
+        st.rerun()
 
     customers = services.list_customers()
     st.subheader("Manage Customers")
@@ -345,16 +348,27 @@ def purchase_page():
         "Supplier", [f'{s["name"]} (ID {s["supplier_id"]})' for s in sups]
     )
     quantity = st.number_input("Quantity", min_value=1, value=1)
+    purchase_price = st.number_input("Purchase price", min_value=0.0, format="%.2f")
     purchase_date = st.date_input("Purchase date", value=date.today())
     if st.button("Save Purchase"):
         product_id = int(product_option.split("ID")[1].strip(") "))
         sup_id = int(sup_option.split("ID")[1].strip(") "))
-        services.add_purchase(product_id, sup_id, int(quantity), None, purchase_date)
+        services.add_purchase(product_id, sup_id, int(quantity), None, purchase_date, purchase_price)
         st.success("Purchase recorded and stock updated.")
+        st.rerun()
 
     st.subheader("Purchase History")
     purchases = services.get_purchase_report()
-    st.dataframe(pd.DataFrame(purchases) if purchases else pd.DataFrame())
+    if purchases:
+        df = pd.DataFrame(purchases)
+        avg_purchase = df.groupby("product_name")["purchase_price"].mean().reset_index().rename(
+            columns={"purchase_price": "avg_purchase_price"}
+        )
+        st.dataframe(df)
+        st.subheader("Average Purchase Price by Product")
+        st.dataframe(avg_purchase)
+    else:
+        st.dataframe(pd.DataFrame())
 
 
 def sales_page():
@@ -371,19 +385,30 @@ def sales_page():
         "Customer", [f'{c["name"]} (ID {c["customer_id"]})' for c in customers]
     )
     quantity = st.number_input("Quantity", min_value=1, value=1)
+    sale_price = st.number_input("Sale price", min_value=0.0, format="%.2f")
     sale_date = st.date_input("Sale date", value=date.today())
     if st.button("Save Sale"):
         product_id = int(product_option.split("ID")[1].strip(") "))
         cust_id = int(cust_option.split("ID")[1].strip(") "))
         try:
-            services.add_sale(product_id, cust_id, int(quantity), sale_date)
+            services.add_sale(product_id, cust_id, int(quantity), sale_date, sale_price)
             st.success("Sale recorded and stock reduced.")
+            st.rerun()
         except ValueError as exc:
             st.error(str(exc))
 
     st.subheader("Sales History")
     sales = services.get_sales_report()
-    st.dataframe(pd.DataFrame(sales) if sales else pd.DataFrame())
+    if sales:
+        df = pd.DataFrame(sales)
+        avg_sales = df.groupby("product_name")["sale_price"].mean().reset_index().rename(
+            columns={"sale_price": "avg_sale_price"}
+        )
+        st.dataframe(df)
+        st.subheader("Average Sale Price by Product")
+        st.dataframe(avg_sales)
+    else:
+        st.dataframe(pd.DataFrame())
 
 
 def reports_page():
@@ -401,9 +426,29 @@ def reports_page():
     with tabs[1]:
         st.dataframe(pd.DataFrame(services.get_low_stock(LOW_STOCK_THRESHOLD)))
     with tabs[2]:
-        st.dataframe(pd.DataFrame(services.get_purchase_report()))
+        purchases = services.get_purchase_report()
+        if purchases:
+            df = pd.DataFrame(purchases)
+            avg_purchase = df.groupby("product_name")["purchase_price"].mean().reset_index().rename(
+                columns={"purchase_price": "avg_purchase_price"}
+            )
+            st.dataframe(df)
+            st.subheader("Average Purchase Price by Product")
+            st.dataframe(avg_purchase)
+        else:
+            st.dataframe(pd.DataFrame())
     with tabs[3]:
-        st.dataframe(pd.DataFrame(services.get_sales_report()))
+        sales = services.get_sales_report()
+        if sales:
+            df = pd.DataFrame(sales)
+            avg_sales = df.groupby("product_name")["sale_price"].mean().reset_index().rename(
+                columns={"sale_price": "avg_sale_price"}
+            )
+            st.dataframe(df)
+            st.subheader("Average Sale Price by Product")
+            st.dataframe(avg_sales)
+        else:
+            st.dataframe(pd.DataFrame())
 
 
 def main():
