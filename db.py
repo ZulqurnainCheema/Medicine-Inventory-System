@@ -1,26 +1,25 @@
 import os
 from contextlib import contextmanager
 
+from dotenv import load_dotenv
 import mysql.connector
 from mysql.connector import Error
+
+# Load .env if present
+load_dotenv()
 
 
 def load_db_config():
     """
-    Load DB configuration from config.py if present; fall back to config_example.py.
-    Environment variables can override keys for portability.
+    Load DB configuration from environment variables.
+    Expected keys: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT.
     """
-    try:
-        import config as cfg  # type: ignore
-    except ImportError:
-        import config_example as cfg  # type: ignore
-
     return {
-        "host": os.getenv("DB_HOST", getattr(cfg, "MYSQL_HOST", "localhost")),
-        "user": os.getenv("DB_USER", getattr(cfg, "MYSQL_USER", "root")),
-        "password": os.getenv("DB_PASSWORD", getattr(cfg, "MYSQL_PASSWORD", "")),
-        "database": os.getenv("DB_NAME", getattr(cfg, "MYSQL_DB", "")),
-        "port": int(os.getenv("DB_PORT", getattr(cfg, "MYSQL_PORT", 3306))),
+        "host": os.getenv("DB_HOST", "localhost"),
+        "user": os.getenv("DB_USER", "root"),
+        "password": os.getenv("DB_PASSWORD", ""),
+        "database": os.getenv("DB_NAME", ""),
+        "port": int(os.getenv("DB_PORT", 3306)),
     }
 
 

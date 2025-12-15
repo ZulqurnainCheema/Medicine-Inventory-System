@@ -3,19 +3,24 @@
 MySQL schema + Streamlit frontend implementing products, categories/subcategories, suppliers, customers, users, purchases, sales, and stock.
 
 ## Setup
-1) Load schema/sample data into MySQL (uses `u230499416_in` in `config.py`):
+1) Create your `.env` from `.env.example` (adjust values if needed):
+```bash
+cp .env.example .env
+```
+
+2) Load schema/sample data into MySQL (uses values from `.env`):
 ```bash
 mysql -u u230499416_in -p -h srv1915.hstgr.io u230499416_in < schema.sql
 ```
 
-2) Configure DB connection: edit `config.py` if you need different credentials.
+3) Configure DB connection by editing `.env` if you need different credentials.
 
-3) Install Python requirements:
+4) Install Python requirements:
 ```bash
 pip install -r requirements.txt
 ```
 
-4) Run the app:
+5) Run the app:
 ```bash
 streamlit run app.py
 ```
