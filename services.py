@@ -3,50 +3,115 @@ from datetime import date, timedelta
 from db import fetch_all, fetch_one, run_query
 
 
-# MEDICINES
-def list_medicines():
-    return fetch_all("SELECT * FROM medicines WHERE is_deleted = 0")
+# CATEGORIES
+def list_categories(parent_id=None):
+    if parent_id is None:
+        return fetch_all("SELECT * FROM categories WHERE parent_category_id IS NULL AND is_deleted = 0")
+    return fetch_all(
+        "SELECT * FROM categories WHERE parent_category_id = %s AND is_deleted = 0",
+        (parent_id,),
+    )
 
 
-def add_medicine(name, category, price):
+def list_all_categories():
+    return fetch_all(
+        """
+        SELECT c.*, parent.name AS parent_name
+        FROM categories c
+        LEFT JOIN categories parent ON c.parent_category_id = parent.category_id
+        WHERE c.is_deleted = 0
+        ORDER BY COALESCE(parent.name, c.name), c.name
+        """
+    )
+
+
+def add_category(name, parent_category_id=None):
     return run_query(
-        "INSERT INTO medicines (name, category, price) VALUES (%s, %s, %s)",
-        (name, category, price),
+        "INSERT INTO categories (name, parent_category_id) VALUES (%s, %s)",
+        (name, parent_category_id),
         return_lastrowid=True,
     )
 
 
-def update_medicine(medicine_id, name=None, category=None, price=None):
+def update_category(category_id, name=None, parent_category_id=None):
     fields = []
     params = []
     if name is not None:
         fields.append("name = %s")
         params.append(name)
-    if category is not None:
-        fields.append("category = %s")
-        params.append(category)
+    if parent_category_id is not None:
+        fields.append("parent_category_id = %s")
+        params.append(parent_category_id)
+    if not fields:
+        return 0
+    params.append(category_id)
+    return run_query(
+        f"UPDATE categories SET {', '.join(fields)} WHERE category_id = %s AND is_deleted = 0",
+        params,
+    )
+
+
+def delete_category(category_id):
+    return run_query(
+        "UPDATE categories SET is_deleted = 1 WHERE category_id = %s", (category_id,)
+    )
+
+
+# PRODUCTS
+def list_products():
+    return fetch_all(
+        """
+        SELECT p.*, cat.name AS category_name, subcat.name AS subcategory_name
+        FROM products p
+        LEFT JOIN categories cat ON p.category_id = cat.category_id AND cat.is_deleted = 0
+        LEFT JOIN categories subcat ON p.subcategory_id = subcat.category_id AND subcat.is_deleted = 0
+        WHERE p.is_deleted = 0
+        """
+    )
+
+
+def add_product(name, category_id, subcategory_id, price):
+    return run_query(
+        "INSERT INTO products (name, category_id, subcategory_id, price) VALUES (%s, %s, %s, %s)",
+        (name, category_id, subcategory_id, price),
+        return_lastrowid=True,
+    )
+
+
+def update_product(product_id, name=None, category_id=None, subcategory_id=None, price=None):
+    fields = []
+    params = []
+    if name is not None:
+        fields.append("name = %s")
+        params.append(name)
+    if category_id is not None:
+        fields.append("category_id = %s")
+        params.append(category_id)
+    if subcategory_id is not None:
+        fields.append("subcategory_id = %s")
+        params.append(subcategory_id)
     if price is not None:
         fields.append("price = %s")
         params.append(price)
     if not fields:
         return 0
-    params.append(medicine_id)
+    params.append(product_id)
     return run_query(
-        f"UPDATE medicines SET {', '.join(fields)} WHERE medicine_id = %s AND is_deleted = 0",
+        f"UPDATE products SET {', '.join(fields)} WHERE product_id = %s AND is_deleted = 0",
         params,
     )
 
 
-def delete_medicine(medicine_id):
+def delete_product(product_id):
     return run_query(
-        "UPDATE medicines SET is_deleted = 1 WHERE medicine_id = %s", (medicine_id,)
+        "UPDATE products SET is_deleted = 1 WHERE product_id = %s", (product_id,)
     )
 
 
-def get_medicine(medicine_id):
+def get_product(product_id):
     return fetch_one(
-        "SELECT * FROM medicines WHERE medicine_id = %s AND is_deleted = 0",
-        (medicine_id,),
+        "SELECT * FROM products WHERE product_id = %s AND is_deleted = 0",
+        (product_id,),
     )
 
 
@@ -123,59 +188,62 @@ def validate_user(username, password):
 
 
 # PURCHASES
-def add_purchase(medicine_id, supplier_id, quantity, expiry_date, purchase_date=None):
+def add_purchase(product_id, supplier_id, quantity, expiry_date=None, purchase_date=None):
     if purchase_date is None:
         purchase_date = date.today()
+    # If no expiry provided, align with purchase_date to satisfy NOT NULL constraint.
+    if expiry_date is None:
+        expiry_date = purchase_date
     purchase_id = run_query(
-        "INSERT INTO purchases (medicine_id, supplier_id, quantity, purchase_date) VALUES (%s, %s, %s, %s)",
-        (medicine_id, supplier_id, quantity, purchase_date),
+        "INSERT INTO purchases (product_id, supplier_id, quantity, purchase_date) VALUES (%s, %s, %s, %s)",
+        (product_id, supplier_id, quantity, purchase_date),
         return_lastrowid=True,
     )
-    upsert_stock(medicine_id, supplier_id, quantity, expiry_date)
+    upsert_stock(product_id, supplier_id, quantity, expiry_date)
     return purchase_id
 
 
 # SALES
-def add_sale(medicine_id, customer_id, quantity, sale_date=None):
+def add_sale(product_id, customer_id, quantity, sale_date=None):
     if sale_date is None:
         sale_date = date.today()
-    deduct_stock(medicine_id, quantity)
+    deduct_stock(product_id, quantity)
     sale_id = run_query(
-        "INSERT INTO sales (medicine_id, customer_id, quantity, sale_date) VALUES (%s, %s, %s, %s)",
-        (medicine_id, customer_id, quantity, sale_date),
+        "INSERT INTO sales (product_id, customer_id, quantity, sale_date) VALUES (%s, %s, %s, %s)",
+        (product_id, customer_id, quantity, sale_date),
         return_lastrowid=True,
     )
     return sale_id
 
 
 # STOCK HELPERS
-def upsert_stock(medicine_id, supplier_id, quantity, expiry_date):
+def upsert_stock(product_id, supplier_id, quantity, expiry_date):
     query = """
-        INSERT INTO stock (medicine_id, supplier_id, quantity, expiry_date)
+        INSERT INTO stock (product_id, supplier_id, quantity, expiry_date)
         VALUES (%s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)
     """
-    run_query(query, (medicine_id, supplier_id, quantity, expiry_date))
+    run_query(query, (product_id, supplier_id, quantity, expiry_date))
 
 
-def deduct_stock(medicine_id, quantity):
+def deduct_stock(product_id, quantity):
     remaining = quantity
     batches = fetch_all(
         """
-        SELECT medicine_id, supplier_id, quantity, expiry_date
+        SELECT product_id, supplier_id, quantity, expiry_date
         FROM stock
-        WHERE medicine_id = %s AND quantity > 0
+        WHERE product_id = %s AND quantity > 0
         ORDER BY expiry_date ASC
         """,
-        (medicine_id,),
+        (product_id,),
     )
     for batch in batches:
         if remaining <= 0:
             break
         to_remove = min(batch["quantity"], remaining)
         run_query(
-            "UPDATE stock SET quantity = quantity - %s WHERE medicine_id = %s AND supplier_id = %s AND expiry_date = %s",
-            (to_remove, batch["medicine_id"], batch["supplier_id"], batch["expiry_date"]),
+            "UPDATE stock SET quantity = quantity - %s WHERE product_id = %s AND supplier_id = %s AND expiry_date = %s",
+            (to_remove, batch["product_id"], batch["supplier_id"], batch["expiry_date"]),
         )
         remaining -= to_remove
     if remaining > 0:
@@ -186,14 +254,20 @@ def deduct_stock(medicine_id, quantity):
 def get_current_stock():
     return fetch_all(
         """
-        SELECT s.medicine_id,
-               m.name AS medicine_name,
+        SELECT s.product_id,
+               m.name AS product_name,
+               m.category_id,
+               m.subcategory_id,
+               cat.name AS category_name,
+               subcat.name AS subcategory_name,
                s.supplier_id,
                sup.name AS supplier_name,
                s.quantity,
                s.expiry_date
         FROM stock s
-        JOIN medicines m ON s.medicine_id = m.medicine_id AND m.is_deleted = 0
+        JOIN products m ON s.product_id = m.product_id AND m.is_deleted = 0
+        LEFT JOIN categories cat ON m.category_id = cat.category_id AND cat.is_deleted = 0
+        LEFT JOIN categories subcat ON m.subcategory_id = subcat.category_id AND subcat.is_deleted = 0
         JOIN suppliers sup ON s.supplier_id = sup.supplier_id AND sup.is_deleted = 0
         ORDER BY s.expiry_date ASC
         """
@@ -203,12 +277,16 @@ def get_current_stock():
 def get_low_stock(threshold):
     return fetch_all(
         """
-        SELECT s.medicine_id,
-               m.name AS medicine_name,
+        SELECT s.product_id,
+               m.name AS product_name,
+               cat.name AS category_name,
+               subcat.name AS subcategory_name,
                SUM(s.quantity) AS total_quantity
         FROM stock s
-        JOIN medicines m ON s.medicine_id = m.medicine_id AND m.is_deleted = 0
-        GROUP BY s.medicine_id, m.name
+        JOIN products m ON s.product_id = m.product_id AND m.is_deleted = 0
+        LEFT JOIN categories cat ON m.category_id = cat.category_id AND cat.is_deleted = 0
+        LEFT JOIN categories subcat ON m.subcategory_id = subcat.category_id AND subcat.is_deleted = 0
+        GROUP BY s.product_id, m.name, cat.name, subcat.name
         HAVING total_quantity <= %s
         """,
         (threshold,),
@@ -220,9 +298,11 @@ def get_near_expiry(days=30):
     cutoff = today + timedelta(days=days)
     return fetch_all(
         """
-        SELECT s.*, m.name AS medicine_name, sup.name AS supplier_name
+        SELECT s.*, m.name AS product_name, sup.name AS supplier_name, cat.name AS category_name, subcat.name AS subcategory_name
         FROM stock s
-        JOIN medicines m ON s.medicine_id = m.medicine_id AND m.is_deleted = 0
+        JOIN products m ON s.product_id = m.product_id AND m.is_deleted = 0
+        LEFT JOIN categories cat ON m.category_id = cat.category_id AND cat.is_deleted = 0
+        LEFT JOIN categories subcat ON m.subcategory_id = subcat.category_id AND subcat.is_deleted = 0
         JOIN suppliers sup ON s.supplier_id = sup.supplier_id AND sup.is_deleted = 0
         WHERE s.expiry_date BETWEEN %s AND %s
         ORDER BY s.expiry_date ASC
@@ -235,9 +315,11 @@ def get_expired():
     today = date.today()
     return fetch_all(
         """
-        SELECT s.*, m.name AS medicine_name, sup.name AS supplier_name
+        SELECT s.*, m.name AS product_name, sup.name AS supplier_name, cat.name AS category_name, subcat.name AS subcategory_name
         FROM stock s
-        JOIN medicines m ON s.medicine_id = m.medicine_id AND m.is_deleted = 0
+        JOIN products m ON s.product_id = m.product_id AND m.is_deleted = 0
+        LEFT JOIN categories cat ON m.category_id = cat.category_id AND cat.is_deleted = 0
+        LEFT JOIN categories subcat ON m.subcategory_id = subcat.category_id AND subcat.is_deleted = 0
         JOIN suppliers sup ON s.supplier_id = sup.supplier_id AND sup.is_deleted = 0
         WHERE s.expiry_date < %s
         ORDER BY s.expiry_date ASC
@@ -250,15 +332,19 @@ def get_sales_report():
     return fetch_all(
         """
         SELECT sa.sale_id,
-               sa.medicine_id,
-               m.name AS medicine_name,
+               sa.product_id,
+               m.name AS product_name,
+               cat.name AS category_name,
+               subcat.name AS subcategory_name,
                sa.customer_id,
-               c.name AS customer_name,
+               cust.name AS customer_name,
                sa.quantity,
                sa.sale_date
         FROM sales sa
-        JOIN medicines m ON sa.medicine_id = m.medicine_id AND m.is_deleted = 0
-        JOIN customers c ON sa.customer_id = c.customer_id AND c.is_deleted = 0
+        JOIN products m ON sa.product_id = m.product_id AND m.is_deleted = 0
+        LEFT JOIN categories cat ON m.category_id = cat.category_id AND cat.is_deleted = 0
+        LEFT JOIN categories subcat ON m.subcategory_id = subcat.category_id AND subcat.is_deleted = 0
+        JOIN customers cust ON sa.customer_id = cust.customer_id AND cust.is_deleted = 0
         ORDER BY sa.sale_id DESC
         """
     )
@@ -268,14 +354,18 @@ def get_purchase_report():
     return fetch_all(
         """
         SELECT p.purchase_id,
-               p.medicine_id,
-               m.name AS medicine_name,
+               p.product_id,
+               m.name AS product_name,
+               cat.name AS category_name,
+               subcat.name AS subcategory_name,
                p.supplier_id,
                sup.name AS supplier_name,
                p.quantity,
                p.purchase_date
         FROM purchases p
-        JOIN medicines m ON p.medicine_id = m.medicine_id AND m.is_deleted = 0
+        JOIN products m ON p.product_id = m.product_id AND m.is_deleted = 0
+        LEFT JOIN categories cat ON m.category_id = cat.category_id AND cat.is_deleted = 0
+        LEFT JOIN categories subcat ON m.subcategory_id = subcat.category_id AND subcat.is_deleted = 0
         JOIN suppliers sup ON p.supplier_id = sup.supplier_id AND sup.is_deleted = 0
         ORDER BY p.purchase_id DESC
         """

@@ -1,5 +1,5 @@
-MYSQL_HOST = "localhost"
-MYSQL_USER = "root"
-MYSQL_PASSWORD = "1122"
-MYSQL_DB = "medical_inventory"
+MYSQL_HOST = "srv1915.hstgr.io"
+MYSQL_USER = "u230499416_in"
+MYSQL_PASSWORD = "Inventory@123.."
+MYSQL_DB = "u230499416_in"
 MYSQL_PORT = 3306
