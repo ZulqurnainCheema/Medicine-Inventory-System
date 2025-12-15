@@ -2,6 +2,7 @@
 name = "medicine_inventory_system"
 version = "0.1.0"
 dependencies = [
+    "dotenv>=0.9.9",
     "mysql-connector-python>=9.4.0",
     "pandas>=2.3.3",
     "python-dateutil>=2.9.0.post0",
