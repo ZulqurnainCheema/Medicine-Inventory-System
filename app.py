@@ -361,12 +361,16 @@ def purchase_page():
     purchases = services.get_purchase_report()
     if purchases:
         df = pd.DataFrame(purchases)
-        avg_purchase = df.groupby("product_name")["purchase_price"].mean().reset_index().rename(
-            columns={"purchase_price": "avg_purchase_price"}
-        )
         st.dataframe(df)
-        st.subheader("Average Purchase Price by Product")
-        st.dataframe(avg_purchase)
+        if "purchase_price" in df.columns:
+            avg_purchase = (
+                df.groupby("product_name")["purchase_price"]
+                .mean()
+                .reset_index()
+                .rename(columns={"purchase_price": "avg_purchase_price"})
+            )
+            st.subheader("Average Purchase Price by Product")
+            st.dataframe(avg_purchase)
     else:
         st.dataframe(pd.DataFrame())
 
@@ -401,12 +405,16 @@ def sales_page():
     sales = services.get_sales_report()
     if sales:
         df = pd.DataFrame(sales)
-        avg_sales = df.groupby("product_name")["sale_price"].mean().reset_index().rename(
-            columns={"sale_price": "avg_sale_price"}
-        )
         st.dataframe(df)
-        st.subheader("Average Sale Price by Product")
-        st.dataframe(avg_sales)
+        if "sale_price" in df.columns:
+            avg_sales = (
+                df.groupby("product_name")["sale_price"]
+                .mean()
+                .reset_index()
+                .rename(columns={"sale_price": "avg_sale_price"})
+            )
+            st.subheader("Average Sale Price by Product")
+            st.dataframe(avg_sales)
     else:
         st.dataframe(pd.DataFrame())
 
@@ -429,24 +437,32 @@ def reports_page():
         purchases = services.get_purchase_report()
         if purchases:
             df = pd.DataFrame(purchases)
-            avg_purchase = df.groupby("product_name")["purchase_price"].mean().reset_index().rename(
-                columns={"purchase_price": "avg_purchase_price"}
-            )
             st.dataframe(df)
-            st.subheader("Average Purchase Price by Product")
-            st.dataframe(avg_purchase)
+            if "purchase_price" in df.columns:
+                avg_purchase = (
+                    df.groupby("product_name")["purchase_price"]
+                    .mean()
+                    .reset_index()
+                    .rename(columns={"purchase_price": "avg_purchase_price"})
+                )
+                st.subheader("Average Purchase Price by Product")
+                st.dataframe(avg_purchase)
         else:
             st.dataframe(pd.DataFrame())
     with tabs[3]:
         sales = services.get_sales_report()
         if sales:
             df = pd.DataFrame(sales)
-            avg_sales = df.groupby("product_name")["sale_price"].mean().reset_index().rename(
-                columns={"sale_price": "avg_sale_price"}
-            )
             st.dataframe(df)
-            st.subheader("Average Sale Price by Product")
-            st.dataframe(avg_sales)
+            if "sale_price" in df.columns:
+                avg_sales = (
+                    df.groupby("product_name")["sale_price"]
+                    .mean()
+                    .reset_index()
+                    .rename(columns={"sale_price": "avg_sale_price"})
+                )
+                st.subheader("Average Sale Price by Product")
+                st.dataframe(avg_sales)
         else:
             st.dataframe(pd.DataFrame())
 
